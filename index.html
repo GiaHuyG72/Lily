@@ -13,7 +13,7 @@
       height: 100%;
       background: #000;
       overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: Georgia, "Times New Roman", serif;
     }
 
     canvas {
@@ -21,28 +21,29 @@
       width: 100vw;
       height: 100vh;
       cursor: pointer;
-      touch-action: none;
+      touch-action: pinch-zoom;
     }
 
-    /* Dòng lời nhắn tinh tế hiện ra khi hoa nở rộ */
     #wishMessage {
       position: fixed;
-      bottom: 8%;
+      bottom: 7.5%;
       left: 50%;
-      transform: translateX(-50%) translateY(10px);
-      width: min(88vw, 540px);
+      transform: translateX(-50%) translateY(12px);
+      width: min(88vw, 560px);
       text-align: center;
-      color: rgba(255, 224, 236, 0.92);
-      font-size: clamp(14px, 3.8vw, 18px);
+      color: rgba(255, 228, 238, 0.94);
+      font-size: clamp(15px, 4vw, 20px);
+      font-style: italic;
       font-weight: 400;
-      letter-spacing: 0.6px;
-      line-height: 1.5;
-      text-shadow: 0 0 14px rgba(255, 130, 175, 0.55);
+      letter-spacing: 0.7px;
+      line-height: 1.6;
+      text-shadow: 0 0 16px rgba(255, 130, 175, 0.6);
       opacity: 0;
       pointer-events: none;
-      transition: opacity 1.6s ease, transform 1.6s ease, color 0.8s ease, text-shadow 0.8s ease;
+      transition: opacity 1.8s ease, transform 1.8s ease, color 0.8s ease, text-shadow 0.8s ease;
       z-index: 5;
       user-select: none;
+      white-space: pre-line;
     }
 
     #wishMessage.visible {
@@ -52,27 +53,26 @@
   </style>
 </head>
 <body>
-  <!-- Tự động phát file nhac.mp3 nếu có trên GitHub, nếu không sẽ tự chơi nhạc piano -->
+  <!-- Tự động phát nhac.mp3 nếu có trên GitHub, nếu không sẽ tự chơi hộp nhạc piano -->
   <audio id="customAudio" src="nhac.mp3" loop preload="auto" autoplay></audio>
   <div id="wishMessage" aria-live="polite"></div>
   <canvas id="canvas"></canvas>
 
   <script>
     // =========================================================================
-    // TÙY CHỈNH LỜI NHẮN MẶC ĐỊNH (Hoặc truyền qua link: ?msg=Nội+dung+của+bạn)
-    // Để trống "" nếu bạn không muốn hiện chữ khi mở link gốc
+    // TÙY CHỈNH LỜI NHẮN (Dùng dấu | để xuống dòng khi truyền qua link ?msg=...)
     // =========================================================================
     const DEFAULT_MESSAGE = "Gửi tặng bạn một bó hoa ly nở rộ ✨";
 
     const wishEl = document.getElementById('wishMessage');
     const urlParams = new URLSearchParams(window.location.search);
     const customMsg = urlParams.get('msg') || urlParams.get('wish') || urlParams.get('text');
-    const activeMessage = (customMsg !== null ? customMsg : DEFAULT_MESSAGE).trim();
+    const rawMessage = (customMsg !== null ? customMsg : DEFAULT_MESSAGE).trim();
+    const activeMessage = rawMessage.replace(/\s*\|\s*/g, '\n');
     if (activeMessage) {
       wishEl.textContent = activeMessage;
     }
 
-    // Kiểm tra cài đặt giảm chuyển động của hệ điều hành (Accessibility)
     const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     let prefersReducedMotion = reduceMotionQuery.matches;
     reduceMotionQuery.addEventListener('change', (e) => {
@@ -80,11 +80,12 @@
     });
 
     // =========================================================================
-    // 1. NHẠC NỀN TỰ ĐỘNG PHÁT
+    // 1. HỆ THỐNG ÂM THANH (NHAC.MP3 + HỘP NHẠC CÓ ĐỘ VANG & CHUÔNG CHẠM HOA)
     // =========================================================================
     const customAudio = document.getElementById('customAudio');
 
     let audioCtx = null;
+    let masterInput = null;
     let isMusicPlaying = false;
     let hasCustomFile = true;
     let noteTimer = null;
@@ -98,18 +99,53 @@
     });
 
     const melodySequence = [
-      { f: 174.61, d: 2.4 }, { f: 261.63, d: 2.0 }, { f: 329.63, d: 2.0 }, { f: 392.00, d: 2.2 },
-      { f: 329.63, d: 1.8 }, { f: 261.63, d: 1.8 }, { f: 440.00, d: 2.4 }, { f: 392.00, d: 2.2 },
-      { f: 164.81, d: 2.4 }, { f: 246.94, d: 2.0 }, { f: 293.66, d: 2.0 }, { f: 392.00, d: 2.2 },
-      { f: 293.66, d: 1.8 }, { f: 246.94, d: 1.8 }, { f: 329.63, d: 2.4 }, { f: 293.66, d: 2.2 },
-      { f: 146.83, d: 2.4 }, { f: 220.00, d: 2.0 }, { f: 261.63, d: 2.0 }, { f: 329.63, d: 2.2 },
-      { f: 261.63, d: 1.8 }, { f: 220.00, d: 1.8 }, { f: 349.23, d: 2.4 }, { f: 329.63, d: 2.2 },
-      { f: 130.81, d: 2.4 }, { f: 196.00, d: 2.0 }, { f: 246.94, d: 2.0 }, { f: 329.63, d: 2.2 },
-      { f: 293.66, d: 1.8 }, { f: 246.94, d: 1.8 }, { f: 261.63, d: 2.6 }, { f: 196.00, d: 2.2 }
+      { f: 174.61, d: 2.5 }, { f: 261.63, d: 2.1 }, { f: 329.63, d: 2.1 }, { f: 392.00, d: 2.3 },
+      { f: 329.63, d: 1.9 }, { f: 261.63, d: 1.9 }, { f: 440.00, d: 2.5 }, { f: 392.00, d: 2.3 },
+      { f: 164.81, d: 2.5 }, { f: 246.94, d: 2.1 }, { f: 293.66, d: 2.1 }, { f: 392.00, d: 2.3 },
+      { f: 293.66, d: 1.9 }, { f: 246.94, d: 1.9 }, { f: 329.63, d: 2.5 }, { f: 293.66, d: 2.3 },
+      { f: 146.83, d: 2.5 }, { f: 220.00, d: 2.1 }, { f: 261.63, d: 2.1 }, { f: 329.63, d: 2.3 },
+      { f: 261.63, d: 1.9 }, { f: 220.00, d: 1.9 }, { f: 349.23, d: 2.5 }, { f: 329.63, d: 2.3 },
+      { f: 130.81, d: 2.5 }, { f: 196.00, d: 2.1 }, { f: 246.94, d: 2.1 }, { f: 329.63, d: 2.3 },
+      { f: 293.66, d: 1.9 }, { f: 246.94, d: 1.9 }, { f: 261.63, d: 2.7 }, { f: 196.00, d: 2.3 }
     ];
 
-    function playSoftNote(freq, duration) {
-      if (!audioCtx || audioCtx.state !== 'running') return;
+    const chimeNotes = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
+
+    function initAudioGraph() {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!audioCtx) {
+        audioCtx = new AudioContextClass();
+
+        // Bộ lọc làm ấm âm thanh + độ vang nhẹ nhàng
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 1450;
+
+        const delay = audioCtx.createDelay(1.0);
+        delay.delayTime.value = 0.34;
+
+        const feedback = audioCtx.createGain();
+        feedback.gain.value = 0.26;
+
+        const wetGain = audioCtx.createGain();
+        wetGain.gain.value = 0.24;
+
+        filter.connect(audioCtx.destination);
+        filter.connect(delay);
+        delay.connect(feedback);
+        feedback.connect(delay);
+        delay.connect(wetGain);
+        wetGain.connect(audioCtx.destination);
+
+        masterInput = filter;
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+    }
+
+    function playSoftNote(freq, duration, peakGain = 0.11) {
+      if (!audioCtx || audioCtx.state !== 'running' || !masterInput) return;
       const now = audioCtx.currentTime;
 
       const oscMain = audioCtx.createOscillator();
@@ -124,17 +160,17 @@
       oscOver.frequency.setValueAtTime(freq * 2, now);
 
       gainMain.gain.setValueAtTime(0.0001, now);
-      gainMain.gain.exponentialRampToValueAtTime(0.11, now + 0.04);
+      gainMain.gain.exponentialRampToValueAtTime(peakGain, now + 0.045);
       gainMain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
       gainOver.gain.setValueAtTime(0.0001, now);
-      gainOver.gain.exponentialRampToValueAtTime(0.018, now + 0.03);
+      gainOver.gain.exponentialRampToValueAtTime(peakGain * 0.16, now + 0.03);
       gainOver.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.65);
 
       oscMain.connect(gainMain);
       oscOver.connect(gainOver);
-      gainMain.connect(audioCtx.destination);
-      gainOver.connect(audioCtx.destination);
+      gainMain.connect(masterInput);
+      gainOver.connect(masterInput);
 
       oscMain.start(now);
       oscOver.start(now);
@@ -142,25 +178,27 @@
       oscOver.stop(now + duration + 0.05);
     }
 
+    function playFlowerChime(idx) {
+      initAudioGraph();
+      const freq = chimeNotes[idx % chimeNotes.length];
+      playSoftNote(freq, 1.8, 0.075);
+    }
+
     function startSynthLoop() {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!audioCtx) {
-        audioCtx = new AudioContextClass();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume().catch(() => {});
-      }
+      initAudioGraph();
       if (noteTimer) return;
 
-      const triggerNext = () => {
+      const scheduleNext = () => {
         if (audioCtx && audioCtx.state === 'running') {
           const note = melodySequence[stepIndex % melodySequence.length];
-          playSoftNote(note.f, note.d);
+          playSoftNote(note.f, note.d, 0.11);
           stepIndex++;
         }
+        // Nhịp rubato tự nhiên nhẹ nhàng thay vì đều máy móc
+        const jitter = 450 + Math.sin(stepIndex * 0.7) * 35;
+        noteTimer = setTimeout(scheduleNext, jitter);
       };
-      triggerNext();
-      noteTimer = setInterval(triggerNext, 460);
+      scheduleNext();
     }
 
     function ensureMusicAutoplay() {
@@ -202,7 +240,6 @@
     // 2. BẢNG MÀU HOA LY (ĐỔI MÀU KHI CHẠM ĐÚP)
     // =========================================================================
     const COLOR_THEMES = [
-      // 0: Hồng phấn cổ điển
       {
         throat: [105, 14, 48],
         deep:   [214, 68, 118],
@@ -210,11 +247,10 @@
         rim:    [255, 246, 250],
         spots:  [92, 10, 38],
         sparkle:[255, 185, 215],
-        moon:   [32, 24, 38],
-        textCol:'rgba(255, 224, 236, 0.92)',
-        textGlow:'0 0 14px rgba(255, 130, 175, 0.55)'
+        moon:   [34, 25, 42],
+        textCol:'rgba(255, 228, 238, 0.94)',
+        textGlow:'0 0 16px rgba(255, 130, 175, 0.6)'
       },
-      // 1: Trắng tinh khôi nhụy vàng
       {
         throat: [118, 148, 42],
         deep:   [198, 216, 172],
@@ -222,11 +258,10 @@
         rim:    [255, 255, 255],
         spots:  [150, 122, 42],
         sparkle:[255, 248, 200],
-        moon:   [24, 32, 42],
-        textCol:'rgba(244, 250, 242, 0.92)',
-        textGlow:'0 0 14px rgba(210, 235, 200, 0.50)'
+        moon:   [25, 34, 46],
+        textCol:'rgba(244, 250, 242, 0.94)',
+        textGlow:'0 0 16px rgba(210, 235, 200, 0.55)'
       },
-      // 2: Cam san hô rực rỡ
       {
         throat: [135, 36, 18],
         deep:   [236, 98, 60],
@@ -234,11 +269,10 @@
         rim:    [255, 246, 234],
         spots:  [122, 26, 14],
         sparkle:[255, 205, 155],
-        moon:   [38, 26, 24],
-        textCol:'rgba(255, 234, 218, 0.92)',
-        textGlow:'0 0 14px rgba(255, 155, 105, 0.55)'
+        moon:   [40, 27, 25],
+        textCol:'rgba(255, 234, 218, 0.94)',
+        textGlow:'0 0 16px rgba(255, 155, 105, 0.6)'
       },
-      // 3: Tím oải hương mộng mơ
       {
         throat: [70, 24, 108],
         deep:   [156, 98, 218],
@@ -246,9 +280,9 @@
         rim:    [250, 245, 255],
         spots:  [58, 16, 94],
         sparkle:[220, 190, 255],
-        moon:   [28, 22, 44],
-        textCol:'rgba(238, 224, 255, 0.92)',
-        textGlow:'0 0 14px rgba(185, 140, 255, 0.55)'
+        moon:   [30, 23, 48],
+        textCol:'rgba(238, 224, 255, 0.94)',
+        textGlow:'0 0 16px rgba(185, 140, 255, 0.6)'
       }
     ];
 
@@ -272,12 +306,11 @@
     }
 
     // =========================================================================
-    // 3. TỐI ƯU CANVAS LƯỚI ASCII & TƯƠNG TÁC
+    // 3. TỐI ƯU CANVAS HI-DPI & TƯƠNG TÁC CHIỀU SÂU 2.5D
     // =========================================================================
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d', { alpha: false });
 
-    // Canvas ẩn có kích thước đúng bằng số cột x số hàng ASCII -> tối ưu tốc độ gấp 20x
     const offCanvas = document.createElement('canvas');
     const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
 
@@ -290,6 +323,7 @@
 
     let width = 0;
     let height = 0;
+    let dpr = 1;
     let cellSize = 4;
     let cols = 0;
     let rows = 0;
@@ -300,7 +334,13 @@
 
     let pointerWind = 0;
     let targetPointerWind = 0;
+    let parallaxX = 0;
+    let parallaxY = 0;
+    let targetParallaxX = 0;
+    let targetParallaxY = 0;
+
     let isPointerDown = false;
+    let activePointerId = null;
     let lastPointerX = 0;
     let pointerDownTime = 0;
     let lastTapTime = 0;
@@ -309,11 +349,26 @@
 
     const burstParticles = [];
     const fallingPetals = [];
+    const shootingStar = {
+      active: false,
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      life: 0,
+      maxLife: 1.1,
+      nextSpawn: 4.5
+    };
 
     function resize() {
-      width = canvas.width = window.innerWidth || 390;
-      height = canvas.height = window.innerHeight || 844;
-      cellSize = Math.max(4, Math.floor(Math.min(width, height) / 112));
+      width = window.innerWidth || 390;
+      height = window.innerHeight || 844;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+
+      cellSize = Math.max(4, Math.floor(Math.min(width, height) / 114));
       cols = Math.ceil(width / cellSize);
       rows = Math.ceil(height / cellSize);
       offCanvas.width = cols;
@@ -381,22 +436,22 @@
     ];
 
     const foliageLeaves = [
-      { stemIdx: 4,  t: 0.24, ang: -0.62, len: 0.23, wid: 0.050, base: '#143b18', tip: '#27662c' },
-      { stemIdx: 6,  t: 0.25, ang:  0.64, len: 0.23, wid: 0.050, base: '#163f1a', tip: '#2b6e30' },
-      { stemIdx: 4,  t: 0.38, ang: -0.95, len: 0.27, wid: 0.056, base: '#1a4a1f', tip: '#347d39' },
-      { stemIdx: 6,  t: 0.37, ang:  0.94, len: 0.27, wid: 0.056, base: '#1c4f22', tip: '#38853d' },
-      { stemIdx: 5,  t: 0.42, ang: -1.12, len: 0.30, wid: 0.058, base: '#215926', tip: '#499e48' },
-      { stemIdx: 2,  t: 0.44, ang:  1.10, len: 0.30, wid: 0.058, base: '#235e28', tip: '#4ca34b' },
-      { stemIdx: 3,  t: 0.48, ang: -0.78, len: 0.26, wid: 0.052, base: '#26662c', tip: '#56b04f' },
-      { stemIdx: 1,  t: 0.50, ang:  0.76, len: 0.26, wid: 0.052, base: '#286b2e', tip: '#5bb553' },
-      { stemIdx: 0,  t: 0.62, ang: -0.58, len: 0.23, wid: 0.046, base: '#2f7835', tip: '#73c75a' },
-      { stemIdx: 1,  t: 0.64, ang:  0.56, len: 0.23, wid: 0.046, base: '#327d38', tip: '#7acc5e' },
-      { stemIdx: 5,  t: 0.68, ang: -0.72, len: 0.24, wid: 0.048, base: '#2d7332', tip: '#6bc255' },
-      { stemIdx: 2,  t: 0.68, ang:  0.70, len: 0.24, wid: 0.048, base: '#2f7835', tip: '#70c759' },
-      { stemIdx: 14, t: 0.55, ang: -1.22, len: 0.22, wid: 0.044, base: '#246129', tip: '#59b350' },
-      { stemIdx: 15, t: 0.55, ang:  1.20, len: 0.22, wid: 0.044, base: '#26662b', tip: '#5eb854' },
-      { stemIdx: 18, t: 0.60, ang: -0.88, len: 0.20, wid: 0.042, base: '#1f5424', tip: '#4aa147' },
-      { stemIdx: 19, t: 0.60, ang:  0.86, len: 0.20, wid: 0.042, base: '#215926', tip: '#4fa64b' }
+      { stemIdx: 4,  t: 0.24, ang: -0.62, len: 0.23, wid: 0.050, base: '#143b18', tip: '#27662c', dew: false },
+      { stemIdx: 6,  t: 0.25, ang:  0.64, len: 0.23, wid: 0.050, base: '#163f1a', tip: '#2b6e30', dew: false },
+      { stemIdx: 4,  t: 0.38, ang: -0.95, len: 0.27, wid: 0.056, base: '#1a4a1f', tip: '#347d39', dew: true },
+      { stemIdx: 6,  t: 0.37, ang:  0.94, len: 0.27, wid: 0.056, base: '#1c4f22', tip: '#38853d', dew: false },
+      { stemIdx: 5,  t: 0.42, ang: -1.12, len: 0.30, wid: 0.058, base: '#215926', tip: '#499e48', dew: false },
+      { stemIdx: 2,  t: 0.44, ang:  1.10, len: 0.30, wid: 0.058, base: '#235e28', tip: '#4ca34b', dew: true },
+      { stemIdx: 3,  t: 0.48, ang: -0.78, len: 0.26, wid: 0.052, base: '#26662c', tip: '#56b04f', dew: false },
+      { stemIdx: 1,  t: 0.50, ang:  0.76, len: 0.26, wid: 0.052, base: '#286b2e', tip: '#5bb553', dew: false },
+      { stemIdx: 0,  t: 0.62, ang: -0.58, len: 0.23, wid: 0.046, base: '#2f7835', tip: '#73c75a', dew: true },
+      { stemIdx: 1,  t: 0.64, ang:  0.56, len: 0.23, wid: 0.046, base: '#327d38', tip: '#7acc5e', dew: false },
+      { stemIdx: 5,  t: 0.68, ang: -0.72, len: 0.24, wid: 0.048, base: '#2d7332', tip: '#6bc255', dew: false },
+      { stemIdx: 2,  t: 0.68, ang:  0.70, len: 0.24, wid: 0.048, base: '#2f7835', tip: '#70c759', dew: false },
+      { stemIdx: 14, t: 0.55, ang: -1.22, len: 0.22, wid: 0.044, base: '#246129', tip: '#59b350', dew: false },
+      { stemIdx: 15, t: 0.55, ang:  1.20, len: 0.22, wid: 0.044, base: '#26662b', tip: '#5eb854', dew: false },
+      { stemIdx: 18, t: 0.60, ang: -0.88, len: 0.20, wid: 0.042, base: '#1f5424', tip: '#4aa147', dew: false },
+      { stemIdx: 19, t: 0.60, ang:  0.86, len: 0.20, wid: 0.042, base: '#215926', tip: '#4fa64b', dew: false }
     ];
 
     const pollenParticles = Array.from({ length: 24 }, (_, i) => ({
@@ -452,16 +507,22 @@
     }
 
     canvas.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary) return;
       const now = performance.now();
       isPointerDown = true;
+      activePointerId = e.pointerId;
       lastPointerX = e.clientX;
       pointerDownTime = now;
 
-      // Chạm đúp để đổi bảng màu hoa
+      targetParallaxX = ((e.clientX / width) - 0.5) * 16;
+      targetParallaxY = ((e.clientY / height) - 0.5) * 12;
+
+      // Chạm đúp để đổi màu bó hoa + phát hợp âm chuông
       if (now - lastTapTime < 320 && Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < 42) {
         themeIndex = (themeIndex + 1) % COLOR_THEMES.length;
         applyThemeTextStyle();
-        spawnBurst(e.clientX, e.clientY, 24, true);
+        spawnBurst(e.clientX, e.clientY, 26, true);
+        playFlowerChime(themeIndex + 2);
         revealWish();
         lastTapTime = 0;
         return;
@@ -470,16 +531,16 @@
       lastTapX = e.clientX;
       lastTapY = e.clientY;
 
-      // Kiểm tra chạm trúng bông hoa ly
       const hitRadius = Math.min(width, height) * 0.14;
       let hitFlower = false;
-      lilyNodes.forEach((node) => {
+      lilyNodes.forEach((node, idx) => {
         const dist = Math.hypot(e.clientX - node.screenX, e.clientY - node.screenY);
         if (dist < hitRadius) {
           node.pulse = 1.0;
           hitFlower = true;
           spawnBurst(node.screenX, node.screenY, 20, true);
           spawnFallingPetal(node.screenX, node.screenY, (Math.random() - 0.5) * 1.2);
+          playFlowerChime(idx);
           revealWish();
         }
       });
@@ -490,7 +551,10 @@
     });
 
     canvas.addEventListener('pointermove', (e) => {
-      if (!isPointerDown) return;
+      targetParallaxX = ((e.clientX / width) - 0.5) * 16;
+      targetParallaxY = ((e.clientY / height) - 0.5) * 12;
+
+      if (!isPointerDown || e.pointerId !== activePointerId) return;
 
       const dx = e.clientX - lastPointerX;
       lastPointerX = e.clientX;
@@ -500,7 +564,6 @@
       if (Math.random() < 0.55) {
         spawnBurst(e.clientX, e.clientY, 2, false);
       }
-      // Vuốt mạnh làm cánh hoa rơi nhẹ
       if (Math.abs(dx) > 6 && Math.random() < 0.25) {
         const donor = lilyNodes[Math.floor(Math.random() * lilyNodes.length)];
         if (donor && donor.screenX > 0) {
@@ -509,34 +572,81 @@
       }
     });
 
-    window.addEventListener('pointerup', () => {
-      isPointerDown = false;
-    });
-
-    // =========================================================================
-    // 4. HÀM VẼ CHI TIẾT MÔI TRƯỜNG, LÁ, HOA LY VÀ HẠT SÁNG
-    // =========================================================================
-    function drawMoonlight(c, cx, cy, bouquetSize, elapsed) {
-      const moonFade = smoothstep(0.5, 3.0, elapsed);
-      if (moonFade <= 0.01) return;
-
-      const mx = cx - bouquetSize * 0.15;
-      const my = cy - bouquetSize * 0.24;
-      const radius = bouquetSize * 0.62;
-      const mCol = currentPalette.moon;
-
-      const grad = c.createRadialGradient(mx, my, radius * 0.05, mx, my, radius);
-      grad.addColorStop(0.0, `rgba(${Math.round(mCol[0] * 1.35)}, ${Math.round(mCol[1] * 1.35)}, ${Math.round(mCol[2] * 1.35)}, ${0.95 * moonFade})`);
-      grad.addColorStop(0.55, `rgba(${Math.round(mCol[0] * 0.7)}, ${Math.round(mCol[1] * 0.7)}, ${Math.round(mCol[2] * 0.7)}, ${0.45 * moonFade})`);
-      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-      c.fillStyle = grad;
-      c.beginPath();
-      c.arc(mx, my, radius, 0, Math.PI * 2);
-      c.fill();
+    function clearPointer(e) {
+      if (e.pointerId === activePointerId) {
+        isPointerDown = false;
+        activePointerId = null;
+      }
     }
 
-    function drawDetailedLeaf(c, x, y, angle, length, widthLeaf, baseCol, tipCol, scale) {
+    window.addEventListener('pointerup', clearPointer);
+    window.addEventListener('pointercancel', clearPointer);
+
+    // =========================================================================
+    // 4. HÀM VẼ MÔI TRƯỜNG, LÁ, HOA LY VÀ HẠT SÁNG
+    // =========================================================================
+    function drawMoonlightAndStars(c, cx, cy, bouquetSize, elapsed, dt) {
+      const moonFade = smoothstep(0.5, 3.0, elapsed);
+      if (moonFade > 0.01) {
+        const mx = cx - bouquetSize * 0.16 - parallaxX * 0.35;
+        const my = cy - bouquetSize * 0.25 - parallaxY * 0.35;
+        const breathe = 1 + Math.sin(elapsed * 0.9) * 0.04;
+        const radius = bouquetSize * 0.64 * breathe;
+        const mCol = currentPalette.moon;
+
+        const grad = c.createRadialGradient(mx, my, radius * 0.05, mx, my, radius);
+        grad.addColorStop(0.0, `rgba(${Math.round(mCol[0] * 1.4)}, ${Math.round(mCol[1] * 1.4)}, ${Math.round(mCol[2] * 1.4)}, ${0.95 * moonFade})`);
+        grad.addColorStop(0.55, `rgba(${Math.round(mCol[0] * 0.72)}, ${Math.round(mCol[1] * 0.72)}, ${Math.round(mCol[2] * 0.72)}, ${0.45 * moonFade})`);
+        grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+        c.fillStyle = grad;
+        c.beginPath();
+        c.arc(mx, my, radius, 0, Math.PI * 2);
+        c.fill();
+      }
+
+      // Sao băng lướt nhẹ qua bầu trời đêm phía trên bó hoa
+      if (!prefersReducedMotion) {
+        if (!shootingStar.active && elapsed > shootingStar.nextSpawn) {
+          shootingStar.active = true;
+          shootingStar.x = width * (0.15 + Math.random() * 0.45);
+          shootingStar.y = height * (0.06 + Math.random() * 0.14);
+          shootingStar.vx = width * (0.38 + Math.random() * 0.2);
+          shootingStar.vy = height * (0.14 + Math.random() * 0.08);
+          shootingStar.life = 0;
+          shootingStar.maxLife = 0.85;
+          shootingStar.nextSpawn = elapsed + 7.5 + Math.random() * 5.0;
+        }
+
+        if (shootingStar.active) {
+          shootingStar.life += dt;
+          shootingStar.x += shootingStar.vx * dt;
+          shootingStar.y += shootingStar.vy * dt;
+
+          const p = shootingStar.life / shootingStar.maxLife;
+          if (p >= 1) {
+            shootingStar.active = false;
+          } else {
+            const alpha = Math.sin(p * Math.PI) * 0.85;
+            const tailX = shootingStar.x - shootingStar.vx * 0.16;
+            const tailY = shootingStar.y - shootingStar.vy * 0.16;
+
+            const starGrad = c.createLinearGradient(tailX, tailY, shootingStar.x, shootingStar.y);
+            starGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+            starGrad.addColorStop(1, `rgba(255, 250, 235, ${alpha})`);
+
+            c.strokeStyle = starGrad;
+            c.lineWidth = Math.max(cellSize * 0.9, 3.5);
+            c.beginPath();
+            c.moveTo(tailX, tailY);
+            c.lineTo(shootingStar.x, shootingStar.y);
+            c.stroke();
+          }
+        }
+      }
+    }
+
+    function drawDetailedLeaf(c, x, y, angle, length, widthLeaf, baseCol, tipCol, scale, hasDew, elapsed) {
       if (scale <= 0.01) return;
       c.save();
       c.translate(x, y);
@@ -561,6 +671,15 @@
       c.moveTo(0, -length * 0.06);
       c.lineTo(0, -length * 0.85);
       c.stroke();
+
+      // Giọt sương nhỏ lấp lánh trên lá
+      if (hasDew && scale > 0.85) {
+        const glint = 0.55 + 0.45 * Math.sin(elapsed * 2.6 + length);
+        c.fillStyle = `rgba(235, 255, 245, ${glint})`;
+        c.beginPath();
+        c.arc(widthLeaf * 0.25, -length * 0.56, Math.max(cellSize * 0.55, 2.4), 0, Math.PI * 2);
+        c.fill();
+      }
 
       c.restore();
     }
@@ -740,7 +859,6 @@
       offCtx.fillStyle = '#000000';
       offCtx.fillRect(0, 0, cols, rows);
 
-      // Quy đổi hệ tọa độ màn hình về trực tiếp lưới ký tự ASCII (cols x rows)
       const invScale = 1 / cellSize;
       offCtx.setTransform(invScale, 0, 0, invScale, 0, 0);
 
@@ -748,30 +866,30 @@
       const cx = width * 0.50;
       const cy = height * 0.48;
 
-      // Vẽ quầng ánh trăng mờ phía sau bó hoa
-      drawMoonlight(offCtx, cx, cy, bouquetSize, elapsed);
+      drawMoonlightAndStars(offCtx, cx, cy, bouquetSize, elapsed, dt);
 
       const motionFactor = prefersReducedMotion ? 0.25 : 1.0;
       const swayStrength = smoothstep(1.4, 4.5, elapsed) * motionFactor;
       const naturalSway = Math.sin(elapsed * 1.5) * 0.030 + Math.sin(elapsed * 2.7) * 0.008;
       const sway = (naturalSway * swayStrength + pointerWind * 0.08) * bouquetSize;
 
-      const baseX = cx + sway * 0.10;
-      const baseY = cy + bouquetSize * 0.56;
+      const baseX = cx + sway * 0.10 + parallaxX * 0.2;
+      const baseY = cy + bouquetSize * 0.56 + parallaxY * 0.2;
 
       const allStems = [];
 
       lilyNodes.forEach((node, idx) => {
         node.pulse = Math.max(0, node.pulse - dt * 1.4);
+        const depthFactor = 0.45 + (node.z / 3) * 0.55;
 
         const p0 = { x: baseX + (idx - 3.5) * bouquetSize * 0.007, y: baseY };
         const p1 = {
-          x: cx + node.bend * bouquetSize * 0.65 + sway * 0.36,
-          y: cy + bouquetSize * 0.20
+          x: cx + node.bend * bouquetSize * 0.65 + sway * 0.36 + parallaxX * 0.45 * depthFactor,
+          y: cy + bouquetSize * 0.20 + parallaxY * 0.45 * depthFactor
         };
         const p2 = {
-          x: cx + node.dx * bouquetSize + sway * (0.85 + Math.abs(node.dy) * 0.45),
-          y: cy + node.dy * bouquetSize + Math.sin(elapsed * 1.5 + node.phase) * 2 * motionFactor
+          x: cx + node.dx * bouquetSize + sway * (0.85 + Math.abs(node.dy) * 0.45) + parallaxX * depthFactor,
+          y: cy + node.dy * bouquetSize + Math.sin(elapsed * 1.5 + node.phase) * 2 * motionFactor + parallaxY * depthFactor
         };
         const grow = smoothstep(node.growStart, node.growEnd, elapsed);
         allStems.push({
@@ -786,12 +904,12 @@
       fillerNodes.forEach((node, idx) => {
         const p0 = { x: baseX + (idx - 2.5) * bouquetSize * 0.006, y: baseY };
         const p1 = {
-          x: cx + node.bend * bouquetSize * 0.65 + sway * 0.34,
-          y: cy + bouquetSize * 0.22
+          x: cx + node.bend * bouquetSize * 0.65 + sway * 0.34 + parallaxX * 0.35,
+          y: cy + bouquetSize * 0.22 + parallaxY * 0.35
         };
         const p2 = {
-          x: cx + node.dx * bouquetSize + sway * 0.85,
-          y: cy + node.dy * bouquetSize
+          x: cx + node.dx * bouquetSize + sway * 0.85 + parallaxX * 0.7,
+          y: cy + node.dy * bouquetSize + parallaxY * 0.7
         };
         const grow = smoothstep(node.growStart, node.growEnd, elapsed);
         allStems.push({
@@ -806,12 +924,12 @@
       twigNodes.forEach((node, idx) => {
         const p0 = { x: baseX + (idx - 2.5) * bouquetSize * 0.006, y: baseY };
         const p1 = {
-          x: cx + node.bend * bouquetSize * 0.60 + sway * 0.30,
-          y: cy + bouquetSize * 0.24
+          x: cx + node.bend * bouquetSize * 0.60 + sway * 0.30 + parallaxX * 0.3,
+          y: cy + bouquetSize * 0.24 + parallaxY * 0.3
         };
         const p2 = {
-          x: cx + node.dx * bouquetSize + sway * 0.75,
-          y: cy + node.dy * bouquetSize
+          x: cx + node.dx * bouquetSize + sway * 0.75 + parallaxX * 0.6,
+          y: cy + node.dy * bouquetSize + parallaxY * 0.6
         };
         const grow = smoothstep(node.growStart, node.growEnd, elapsed);
         allStems.push({
@@ -842,7 +960,10 @@
 
       const tieGrow = smoothstep(0.1, 0.7, elapsed);
       if (tieGrow > 0.01) {
-        const tiePos = { x: lerp(baseX, cx + sway * 0.22, 0.45), y: lerp(baseY, cy + bouquetSize * 0.22, 0.45) };
+        const tiePos = {
+          x: lerp(baseX, cx + sway * 0.22 + parallaxX * 0.3, 0.45),
+          y: lerp(baseY, cy + bouquetSize * 0.22 + parallaxY * 0.3, 0.45)
+        };
         offCtx.strokeStyle = '#58ad4e';
         offCtx.lineWidth = Math.max(cellSize * 1.2, bouquetSize * 0.018 * tieGrow);
         offCtx.beginPath();
@@ -868,7 +989,9 @@
           lf.wid * bouquetSize,
           lf.base,
           lf.tip,
-          smoothstep(0, 1, leafGrow)
+          smoothstep(0, 1, leafGrow),
+          lf.dew,
+          elapsed
         );
       });
 
@@ -908,7 +1031,6 @@
           );
         });
 
-      // Cánh hoa rơi nhẹ tự nhiên sau khi hoa nở
       if (elapsed > 4.5 && !prefersReducedMotion && Math.random() < dt * 1.3) {
         const donor = lilyNodes[Math.floor(Math.random() * lilyNodes.length)];
         if (donor && donor.maxOpen > 0.5 && donor.screenX > 0) {
@@ -948,15 +1070,14 @@
         offCtx.restore();
       }
 
-      // Hạt phấn hoa bay tự nhiên quanh bó hoa
       const particleAlpha = smoothstep(3.2, 5.2, elapsed);
       const sp = currentPalette.sparkle;
       if (particleAlpha > 0.01) {
         pollenParticles.forEach((pt) => {
           const cycle = (elapsed * pt.speed * motionFactor + pt.seed) % 1;
           const fade = Math.sin(cycle * Math.PI) * particleAlpha;
-          const px = cx + pt.rx * bouquetSize * 0.85 + Math.sin(elapsed * 1.4 + pt.seed) * 14 * motionFactor + sway * 0.7;
-          const py = cy + pt.ry * bouquetSize * 0.55 - cycle * bouquetSize * 0.28;
+          const px = cx + pt.rx * bouquetSize * 0.85 + Math.sin(elapsed * 1.4 + pt.seed) * 14 * motionFactor + sway * 0.7 + parallaxX * 0.8;
+          const py = cy + pt.ry * bouquetSize * 0.55 - cycle * bouquetSize * 0.28 + parallaxY * 0.8;
 
           offCtx.fillStyle = pt.isAccent
             ? `rgba(${Math.round(sp[0])}, ${Math.round(sp[1])}, ${Math.round(sp[2])}, ${fade})`
@@ -967,15 +1088,14 @@
         });
       }
 
-      // Vòng đom đóm ma thuật xoay quanh bó hoa khi nhấn giữ màn hình
       if (isPointerDown && performance.now() - pointerDownTime > 220) {
         const fireflyCount = 16;
         for (let i = 0; i < fireflyCount; i++) {
           const a = elapsed * 2.4 + (i / fireflyCount) * Math.PI * 2;
           const orbitRx = bouquetSize * (0.34 + (i % 3) * 0.08);
           const orbitRy = bouquetSize * (0.26 + (i % 2) * 0.07);
-          const fx = cx + Math.cos(a) * orbitRx + sway * 0.5;
-          const fy = cy - bouquetSize * 0.14 + Math.sin(a * 1.3) * orbitRy;
+          const fx = cx + Math.cos(a) * orbitRx + sway * 0.5 + parallaxX * 0.9;
+          const fy = cy - bouquetSize * 0.14 + Math.sin(a * 1.3) * orbitRy + parallaxY * 0.9;
 
           offCtx.fillStyle = i % 2 === 0
             ? `rgba(${Math.round(sp[0])}, ${Math.round(sp[1])}, ${Math.round(sp[2])}, 0.95)`
@@ -986,7 +1106,6 @@
         }
       }
 
-      // Hạt bung nở khi chạm vào hoa hoặc vuốt tay
       for (let i = burstParticles.length - 1; i >= 0; i--) {
         const p = burstParticles[i];
         p.x += p.vx * dt;
@@ -1008,14 +1127,13 @@
     }
 
     // =========================================================================
-    // 5. KẾT XUẤT LƯỚI KÝ TỰ ASCII TỐC ĐỘ CAO
+    // 5. KẾT XUẤT LƯỚI KÝ TỰ ASCII SẮC NÉT
     // =========================================================================
     function renderAscii(now) {
-      const elapsed = (now - startTime) / 800;
+      const elapsed = (now - startTime) / 1000;
       const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
       lastFrameTime = now;
 
-      // Tự động hiện lời nhắn khi hoa ly bắt đầu nở rộ
       if (elapsed > 5.0 && !wishShown) {
         revealWish();
       }
@@ -1026,9 +1144,12 @@
         targetPointerWind *= 0.92;
       }
       pointerWind = lerp(pointerWind, targetPointerWind, 0.12);
+      parallaxX = lerp(parallaxX, targetParallaxX, 0.08);
+      parallaxY = lerp(parallaxY, targetParallaxY, 0.08);
 
       renderScene(elapsed, dt);
 
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, width, height);
 
